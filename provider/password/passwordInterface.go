@@ -2,5 +2,5 @@ package password
 
 type PasswordInterface interface {
 	Hash(inputPassword string) string
-	Compare(inputPassword string, actualPassword string) bool
+	Match(inputPassword string, actualPassword string) bool
 }

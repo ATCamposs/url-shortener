@@ -14,8 +14,6 @@ import (
 	"github.com/atcamposs/url-shortener/util"
 	"github.com/dgrijalva/jwt-go"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -52,7 +50,7 @@ func CreateUser(c *fiber.Ctx) error {
 	if registrationError != nil {
 		return c.JSON(fiber.Map{
 			"error": true,
-			"input": registrationError,
+			"value": registrationError,
 		})
 	}
 
@@ -71,32 +69,29 @@ func CreateUser(c *fiber.Ctx) error {
 // LoginUser route logins a user in the app
 func LoginUser(c *fiber.Ctx) error {
 	type LoginInput struct {
-		Identity string `json:"identity"`
+		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
 	input := new(LoginInput)
 
 	if err := c.BodyParser(input); err != nil {
-		return c.JSON(fiber.Map{"error": true, "input": "Please review your input"})
+		return c.JSON(fiber.Map{
+			"error": true,
+			"input": "Please review your input",
+		})
 	}
 
-	// check if a user exists
-	u := new(entity.User)
-	if res := db.DB.Where(
-		&entity.User{Email: input.Identity}).Or(
-		&entity.User{Username: input.Identity},
-	).First(&u); res.RowsAffected <= 0 {
-		return c.JSON(fiber.Map{"error": true, "general": "Invalid Credentials."})
-	}
-
-	// Comparing the password with the hash
-	if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(input.Password)); err != nil {
-		return c.JSON(fiber.Map{"error": true, "general": "Invalid Credentials."})
+	user, loginError := application.Login(input.Email, input.Password)
+	if loginError != nil {
+		return c.JSON(fiber.Map{
+			"error": true,
+			"user":  "invalid email or password",
+		})
 	}
 
 	// setting up the authorization cookies
-	accessToken, refreshToken := util.GenerateTokens(u.UUID.String())
+	accessToken, refreshToken := util.GenerateTokens(user.UUID.String())
 	accessCookie, refreshCookie := util.GetAuthCookies(accessToken, refreshToken)
 	c.Cookie(accessCookie)
 	c.Cookie(refreshCookie)

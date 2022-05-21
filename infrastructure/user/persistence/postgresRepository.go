@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
@@ -29,10 +30,10 @@ func (r *PostgresRepository) Create(u entity.User) bool {
 }
 
 func (r *PostgresRepository) CheckEmailExists(email string) bool {
-	stmt, err := infrastructure.DefaultConnection.Prepare(`SELECT COUNT(uuid) FROM users WHERE email=$1`)
+	stmt, err := infrastructure.DefaultConnection.Prepare(`SELECT COUNT(*) FROM users WHERE email=$1`)
 	checkErrors(err)
 
-	log.Printf(`SELECT COUNT(uuid) FROM users WHERE email='%s'`, email)
+	log.Printf(`SELECT COUNT(*) FROM users WHERE email='%s'`, email)
 
 	count := 0
 	err = stmt.QueryRow(email).Scan(&count)
@@ -42,16 +43,31 @@ func (r *PostgresRepository) CheckEmailExists(email string) bool {
 }
 
 func (r *PostgresRepository) CheckUsernameExists(username string) bool {
-	stmt, err := infrastructure.DefaultConnection.Prepare(`SELECT COUNT(uuid) FROM users WHERE username=$1`)
+	stmt, err := infrastructure.DefaultConnection.Prepare(`SELECT COUNT(*) FROM users WHERE username=$1`)
 	checkErrors(err)
 
-	log.Printf(`SELECT COUNT(uuid) FROM users WHERE username='%s'`, username)
+	log.Printf(`SELECT COUNT(*) FROM users WHERE username='%s'`, username)
 
 	count := 0
 	err = stmt.QueryRow(username).Scan(&count)
 	checkErrors(err)
 
 	return count > 0
+}
+
+func (r *PostgresRepository) RetrieveUserByEmail(email string) (entity.User, error) {
+	stmt, err := infrastructure.DefaultConnection.Prepare(`SELECT * FROM users WHERE email=$1`)
+	checkErrors(err)
+
+	log.Printf(`SELECT * FROM users WHERE email='%s'`, email)
+
+	var user entity.User
+	err = stmt.QueryRow(email).Scan(&user.UUID, &user.Email, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
+	if err == nil {
+		return user, nil
+	}
+
+	return user, errors.New("no rows return")
 }
 
 func checkErrors(err error) {

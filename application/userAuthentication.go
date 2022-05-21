@@ -10,7 +10,6 @@ import (
 	"github.com/atcamposs/url-shortener/provider/date"
 	"github.com/atcamposs/url-shortener/provider/password"
 	"github.com/atcamposs/url-shortener/util"
-	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
 
@@ -27,15 +26,11 @@ func Register(newUser *valueobject.NewUser) (entity.User, error) {
 	}
 
 	if userRepository.CheckEmailExists(newUser.Email) {
-		registerErrors.Err, registerErrors.Email = true, "Email is already registered"
-		emailExists, _ := json.Marshal(registerErrors)
-		return entity.User{}, errors.New(string(emailExists))
+		return entity.User{}, errors.New("email is already registered")
 	}
 
 	if userRepository.CheckUsernameExists(newUser.Username) {
-		registerErrors.Err, registerErrors.Username = true, "Username is already registered"
-		usernameExists, _ := json.Marshal(registerErrors)
-		return entity.User{}, errors.New(string(usernameExists))
+		return entity.User{}, errors.New("username is already registered")
 	}
 
 	now := dateTimeProvider.NowInRfc3339()
@@ -49,21 +44,22 @@ func Register(newUser *valueobject.NewUser) (entity.User, error) {
 	}
 
 	if !userRepository.Create(user) {
-		registerErrors.Err, registerErrors.Username = true, "Something went wrong, please try again later. 😕"
-		cannotRegister, _ := json.Marshal(registerErrors)
-		return entity.User{}, errors.New(string(cannotRegister))
+		return entity.User{}, errors.New("cannot create user")
 	}
 
 	return user, nil
+}
 
-	// setting up the authorization cookies
-	accessToken, refreshToken := util.GenerateTokens(user.UUID.String())
-	accessCookie, refreshCookie := util.GetAuthCookies(accessToken, refreshToken)
-	c.Cookie(accessCookie)
-	c.Cookie(refreshCookie)
+func Login(email string, password string) (entity.User, error) {
+	user, loginError := userRepository.RetrieveUserByEmail(email)
+	if loginError != nil {
+		return entity.User{}, errors.New("user not found")
+	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-	})
+	passwordMatch := passwordProvider.Match(user.Password, password)
+	if !passwordMatch {
+		return entity.User{}, errors.New("invalid password")
+	}
+
+	return user, nil
 }

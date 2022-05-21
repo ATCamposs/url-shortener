@@ -25,7 +25,7 @@ func (p *BcryptPassword) Hash(inputPassword string) string {
 	return string(hashedPassword)
 }
 
-func (p *BcryptPassword) Compare(inputPassword string, actualPassword string) bool {
+func (p *BcryptPassword) Match(inputPassword string, actualPassword string) bool {
 	// Comparing the password with the hash
 	if err := bcrypt.CompareHashAndPassword([]byte(inputPassword), []byte(actualPassword)); err != nil {
 		return false
