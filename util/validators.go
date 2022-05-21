@@ -2,7 +2,7 @@ package util
 
 import (
 	valid "github.com/asaskevich/govalidator"
-	"github.com/atcamposs/url-shortener/models"
+	valueobject "github.com/atcamposs/url-shortener/domain/user/valueObject"
 )
 
 // IsEmpty checks if a string is empty
@@ -15,8 +15,8 @@ func IsEmpty(str string) (bool, string) {
 }
 
 // ValidateRegister func validates the body of user for registration
-func ValidateRegister(u *models.User) *models.UserErrors {
-	e := &models.UserErrors{}
+func ValidateRegister(u *valueobject.NewUser) *valueobject.UserErrors {
+	e := &valueobject.UserErrors{}
 	e.Err, e.Username = IsEmpty(u.Username)
 
 	if !valid.IsEmail(u.Email) {

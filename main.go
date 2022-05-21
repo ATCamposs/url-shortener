@@ -1,13 +1,16 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 
-	"github.com/atcamposs/url-shortener/database"
+	"github.com/atcamposs/url-shortener/infrastructure"
 	"github.com/atcamposs/url-shortener/router"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
+
+var DefaultConnection *sql.DB
 
 // CreateServer creates a new Fiber instance
 func CreateServer() *fiber.App {
@@ -18,7 +21,9 @@ func CreateServer() *fiber.App {
 
 func main() {
 	//Connect to database
-	database.ConnectToDB()
+	infrastructure.StartPostgresConnection()
+	infrastructure.DefaultConnection = *infrastructure.PostgresConnection
+
 	app := CreateServer()
 
 	app.Use(cors.New())

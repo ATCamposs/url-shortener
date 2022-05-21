@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/atcamposs/url-shortener/models"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -22,7 +21,7 @@ func ConnectToDB() {
 		log.Fatal("Error loading env file \n", err)
 	}
 
-	dsn := fmt.Sprintf("host=localhost user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Kolkata",
+	dsn := fmt.Sprintf("host=localhost user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=America/Sao_Paulo",
 		os.Getenv("PSQL_USER"), os.Getenv("PSQL_PASS"), os.Getenv("PSQL_DBNAME"), os.Getenv("PSQL_PORT"))
 
 	log.Print("Connecting to PostgreSQL DB...")
@@ -41,5 +40,5 @@ func ConnectToDB() {
 	DB.Logger = logger.Default.LogMode(logger.Info)
 
 	log.Print("Running the migrations...")
-	DB.AutoMigrate(&models.User{}, &models.Claims{})
+	//DB.AutoMigrate(&entity.User{}, &entity.Claims{})
 }

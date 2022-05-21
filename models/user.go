@@ -7,8 +7,8 @@ import (
 // User represents a User schema
 type User struct {
 	Base
-	Email    string `json:"email" gorm:"unique"`
-	Username string `json:"username" gorm:"unique"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
@@ -23,5 +23,5 @@ type UserErrors struct {
 // Claims represent the structure of the JWT token
 type Claims struct {
 	jwt.StandardClaims
-	ID uint `gorm:"primaryKey"`
+	ID uint
 }

@@ -1,12 +1,16 @@
 package router
 
 import (
-	"math/rand"
 	"os"
 	"time"
 
+	"github.com/atcamposs/url-shortener/application"
 	db "github.com/atcamposs/url-shortener/database"
-	"github.com/atcamposs/url-shortener/models"
+	"github.com/atcamposs/url-shortener/domain/user/entity"
+	valueobject "github.com/atcamposs/url-shortener/domain/user/valueObject"
+	"github.com/atcamposs/url-shortener/infrastructure/user/persistence"
+	"github.com/atcamposs/url-shortener/provider/date"
+	"github.com/atcamposs/url-shortener/provider/password"
 	"github.com/atcamposs/url-shortener/util"
 	"github.com/dgrijalva/jwt-go"
 
@@ -16,6 +20,10 @@ import (
 )
 
 var jwtKey = []uint8(os.Getenv("PRIV_KEY"))
+
+var passwordProvider = new(password.BcryptPassword)
+var dateProvider = new(date.TimeDate)
+var userRepository = new(persistence.PostgresRepository)
 
 // SetupUserRoutes func sets up all the user routes
 func SetupUserRoutes() {
@@ -27,57 +35,29 @@ func SetupUserRoutes() {
 	privUser := USER.Group("/private")
 	privUser.Use(util.SecureAuth()) // middleware to secure all routes for this group
 	privUser.Get("/user", GetUserData)
-
 }
 
 // CreateUser route registers a User into the database
 func CreateUser(c *fiber.Ctx) error {
-	u := new(models.User)
+	newUser := new(valueobject.NewUser)
 
-	if err := c.BodyParser(u); err != nil {
+	if err := c.BodyParser(newUser); err != nil {
 		return c.JSON(fiber.Map{
 			"error": true,
 			"input": "Please review your input",
 		})
 	}
 
-	// validate if the email, username and password are in correct format
-	errors := util.ValidateRegister(u)
-	if errors.Err {
-		return c.JSON(errors)
-	}
-
-	if count := db.DB.Where(&models.User{Email: u.Email}).First(new(models.User)).RowsAffected; count > 0 {
-		errors.Err, errors.Email = true, "Email is already registered"
-	}
-	if count := db.DB.Where(&models.User{Username: u.Username}).First(new(models.User)).RowsAffected; count > 0 {
-		errors.Err, errors.Username = true, "Username is already registered"
-	}
-	if errors.Err {
-		return c.JSON(errors)
-	}
-
-	// Hashing the password with a random salt
-	password := []byte(u.Password)
-	hashedPassword, err := bcrypt.GenerateFromPassword(
-		password,
-		rand.Intn(bcrypt.MaxCost-bcrypt.MinCost)+bcrypt.MinCost,
-	)
-
-	if err != nil {
-		panic(err)
-	}
-	u.Password = string(hashedPassword)
-
-	if err := db.DB.Create(&u).Error; err != nil {
+	user, registrationError := application.Register(newUser)
+	if registrationError != nil {
 		return c.JSON(fiber.Map{
-			"error":   true,
-			"general": "Something went wrong, please try again later. 😕",
+			"error": true,
+			"input": registrationError,
 		})
 	}
 
 	// setting up the authorization cookies
-	accessToken, refreshToken := util.GenerateTokens(u.UUID.String())
+	accessToken, refreshToken := util.GenerateTokens(user.UUID.String())
 	accessCookie, refreshCookie := util.GetAuthCookies(accessToken, refreshToken)
 	c.Cookie(accessCookie)
 	c.Cookie(refreshCookie)
@@ -102,10 +82,10 @@ func LoginUser(c *fiber.Ctx) error {
 	}
 
 	// check if a user exists
-	u := new(models.User)
+	u := new(entity.User)
 	if res := db.DB.Where(
-		&models.User{Email: input.Identity}).Or(
-		&models.User{Username: input.Identity},
+		&entity.User{Email: input.Identity}).Or(
+		&entity.User{Username: input.Identity},
 	).First(&u); res.RowsAffected <= 0 {
 		return c.JSON(fiber.Map{"error": true, "general": "Invalid Credentials."})
 	}
@@ -131,7 +111,7 @@ func LoginUser(c *fiber.Ctx) error {
 func GetUserData(c *fiber.Ctx) error {
 	id := c.Locals("id")
 
-	u := new(models.User)
+	u := new(entity.User)
 	if res := db.DB.Where("uuid = ?", id).First(&u); res.RowsAffected <= 0 {
 		return c.JSON(fiber.Map{"error": true, "general": "Cannot find the User"})
 	}
@@ -143,7 +123,7 @@ func GetUserData(c *fiber.Ctx) error {
 func GetAccessToken(c *fiber.Ctx) error {
 	refreshToken := c.Cookies("refresh_token")
 
-	refreshClaims := new(models.Claims)
+	refreshClaims := new(entity.Claims)
 	token, _ := jwt.ParseWithClaims(refreshToken, refreshClaims,
 		func(token *jwt.Token) (interface{}, error) {
 			return jwtKey, nil
@@ -152,7 +132,7 @@ func GetAccessToken(c *fiber.Ctx) error {
 	if res := db.DB.Where(
 		"expires_at = ? AND issued_at = ? AND issuer = ?",
 		refreshClaims.ExpiresAt, refreshClaims.IssuedAt, refreshClaims.Issuer,
-	).First(&models.Claims{}); res.RowsAffected <= 0 {
+	).First(&entity.Claims{}); res.RowsAffected <= 0 {
 		// no such refresh token exist in the database
 		c.ClearCookie("access_token", "refresh_token")
 		return c.SendStatus(fiber.StatusForbidden)
